@@ -3,9 +3,9 @@
 Тестове завдання AI-first Backend Engineer: сервіс готуватиме відповіді підтримки
 за базою знань і надсилатиме їх лише після підтвердження оператором.
 
-**Стан: завершено тільки етап 1 — основа.** Зараз працює `/health`, підключено
-конфігурацію, SQLAlchemy, Alembic та PostgreSQL у Compose. Вебхук, worker, LLM,
-інтерфейс і мок хелпдеску ще не реалізовані.
+**Стан: завершено етап 2 — приймання вебхука.** Працюють `/health` і
+`POST /webhooks/helpdesk`, транзакційне збереження події та generation job у PostgreSQL.
+Worker, LLM, інтерфейс і мок хелпдеску ще не реалізовані; jobs залишаються `pending`.
 
 ## Docker Compose
 
@@ -76,18 +76,65 @@ docker compose run --rm migrate
 docker compose run --rm migrate alembic current
 ```
 
-На цьому етапі baseline створює лише службову `alembic_version`.
-Тести конкурентності з'являться разом із відповідною бізнес-логікою.
+Поточна міграція `0002_events_jobs` створює `helpdesk_events` і `jobs`.
+Для інтеграційних тестів потрібен користувач PostgreSQL із правом `CREATE DATABASE`:
+
+```powershell
+$env:TEST_DATABASE_URL = 'postgresql+asyncpg://support:support@127.0.0.1:5432/postgres'
+.venv313\Scripts\python.exe -m pytest -q
+```
+
+Тести створюють випадково названу БД `support_test_<uuid>`, застосовують справжні
+міграції та видаляють лише цю БД після завершення. Базу з указаного DSN не очищають.
+Без `TEST_DATABASE_URL` інтеграційні тести пропускаються; це не повна перевірка.
+Використовуємо `127.0.0.1`: на цій Windows IPv6 для `localhost` затримує підключення.
+
+## Вебхук
+
+```powershell
+$payload = @{
+    event_id = 'evt_demo_1'
+    ticket_id = 'T-1042'
+    customer_email = 'user@example.com'
+    message = 'Не можу експортувати звіт у PDF'
+    reply_url = 'http://mock-helpdesk:8000/tickets/T-1042/replies'
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8001/webhooks/helpdesk `
+    -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($payload))
+```
+
+Для стандартного `APP_PORT=8000` замініть порт у прикладі. Мок ще не існує,
+але на цьому етапі API лише зберігає `reply_url` і не звертається до нього.
+
+- Нова подія → `202 {"event_id":"evt_demo_1","status":"accepted"}` після commit.
+- Повтор із тим самим вмістом → `202` зі статусом `duplicate`, без другого job.
+- Той самий `event_id` з іншим вмістом → `409`, оригінал зберігається.
+- Невалідні поля → `422`; недоступна/заблокована БД → `503`, `Retry-After: 1`.
+- Ідентифікатори: 1–200 символів; message: 1–20 000, не лише пробіли;
+  email: до 320 із базовою перевіркою структури; reply URL: HTTP(S), до 2048,
+  без вбудованих credentials. Allowlist адрес додамо перед зовнішніми доставками.
+
+Унікальний primary key `event_id` і `INSERT ... ON CONFLICT DO NOTHING` захищають
+від гонки. Подія й завдання комітяться однією транзакцією; при помилці job подія
+також відкочується. Вебхук не викликає LLM і не надсилає повідомлень клієнтам.
+Підхід до конкурентного INSERT описано в [документації SQLAlchemy](https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#insert-on-conflict-upsert).
+
+Бюджет обробки — 1.5 секунди, таймаути з'єднання й SQL-команди — 1 секунда,
+очікування пулу — 0.3 секунди. Це залишає запас до таймауту хелпдеску за нормальних
+умов; мережа/планування ОС можуть впливати на повний HTTP-час. Якщо commit відбувся,
+але HTTP-відповідь загубилася, повтор знайде вже збережений `event_id`.
 
 ## Структура та рішення
 
 - `app/main.py` — фабрика FastAPI, lifespan, `/health`.
 - `app/config.py` — типізовані налаштування, секретний ключ через `SecretStr`.
 - `app/db.py` — async engine, фабрика сесій і база моделей.
+- `app/models.py` — події та durable jobs.
+- `app/webhooks.py` — валідація й атомарне приймання події.
 - `migrations/` — Alembic із підтримкою asyncpg.
 - `docs/specification.md` — перевірені вимоги та етапи.
 - `docs/decisions.md` — архітектура й межі гарантій доставки.
 - `AGENTS.md` — правила та використана конфігурація агента.
 
-Наступний етап: вебхук із транзакційним збереженням події та durable job.
+Наступний етап: worker, leases, відновлення, повтори та спільний ліміт LLM.
 Публікацію GitHub і платні зовнішні дії ще не виконували.

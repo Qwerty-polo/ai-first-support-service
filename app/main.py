@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.config import Settings, get_settings
 from app.db import create_engine, create_session_factory
+from app.webhooks import router as webhooks_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -20,6 +21,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await engine.dispose()
 
     application = FastAPI(title="Support Draft Service", version="0.1.0", lifespan=lifespan)
+    application.include_router(webhooks_router)
 
     @application.get("/health", tags=["operations"])
     async def health() -> dict[str, str]:
