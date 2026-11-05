@@ -26,7 +26,9 @@ class Worker:
         try:
             async with asyncio.timeout(HANDLER_TIMEOUT):
                 result = await self.handlers[claim.kind](claim)
-        except (TimeoutError, RetryableError):
+        except (TimeoutError, RetryableError, SQLAlchemyError, OSError):
+            # Reads inside a handler can also lose the DB connection. Retry the durable job;
+            # if recording the retry fails too, its lease still permits crash recovery.
             await self.queue.fail(claim, "temporary_handler_failure", retryable=True)
         except PermanentError:
             await self.queue.fail(claim, "permanent_handler_failure", retryable=False)

@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import pytest
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from app.models import HelpdeskEvent, Job, LLMAdmission
@@ -202,3 +203,81 @@ async def test_timeout_retries_and_unknown_jobs_stay_pending(
     async with queue.sessions() as session:
         job = (await session.scalars(select(Job))).one()
         assert job.state == "pending" and job.attempts == 1
+
+
+@pytest.mark.parametrize(
+    "error",
+    [OperationalError(None, None, Exception("PRIVATE_DATABASE_DETAIL")), OSError("offline")],
+)
+async def test_handler_storage_outage_retries_then_recovers(
+    engine: AsyncEngine, error: Exception, caplog: pytest.LogCaptureFixture
+) -> None:
+    queue = await seed(engine)
+    calls = 0
+
+    async def temporarily_unavailable(claim: Claim) -> dict:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise error
+        return {"message": "Recovered"}
+
+    worker = Worker(queue, {"generation": temporarily_unavailable})
+    assert await worker.run_once()
+    async with queue.sessions.begin() as session:
+        job = (await session.scalars(select(Job))).one()
+        assert job.state == "pending" and job.last_error == "temporary_handler_failure"
+        job.available_at = func.clock_timestamp()
+    assert await worker.run_once()
+    async with queue.sessions() as session:
+        job = (await session.scalars(select(Job))).one()
+        assert job.state == "succeeded" and job.attempts == 2
+        assert job.result == {"message": "Recovered"}
+        assert await session.scalar(select(func.count()).select_from(LLMAdmission)) == 2
+    assert "PRIVATE_DATABASE_DETAIL" not in caplog.text
+
+
+async def test_storage_outage_does_not_stop_worker_loop(
+    engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    queue = await seed(engine)
+    original_claim = queue.claim
+    attempts = 0
+    completed = asyncio.Event()
+
+    async def flaky_claim(kinds: tuple[str, ...]) -> Claim | None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OperationalError(None, None, Exception("PRIVATE_DATABASE_DETAIL"))
+        return await original_claim(kinds)
+
+    async def handle(claim: Claim) -> dict:
+        completed.set()
+        return {"ok": True}
+
+    monkeypatch.setattr(queue, "claim", flaky_claim)
+    task = asyncio.create_task(Worker(queue, {"generation": handle}).run())
+    try:
+        await asyncio.wait_for(completed.wait(), timeout=5)
+        assert attempts >= 2
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    assert "Worker storage unavailable" in caplog.text
+    assert "PRIVATE_DATABASE_DETAIL" not in caplog.text
+
+
+async def test_delivery_is_not_blocked_by_exhausted_llm_budget(engine: AsyncEngine) -> None:
+    queue = await seed(engine)
+    async with queue.sessions.begin() as session:
+        now = await session.scalar(select(func.clock_timestamp()))
+        session.add_all(LLMAdmission(admitted_at=now) for _ in range(60))
+        session.add(Job(event_id="evt0", kind="delivery", payload={"message": "Approved"}))
+    claim = await queue.claim(("generation", "delivery"))
+    assert claim is not None and claim.kind == "delivery"
+    assert await queue.finish(claim, {"status": "sent"})
+    assert await queue.claim(("generation", "delivery")) is None
+    async with queue.sessions() as session:
+        assert await session.scalar(select(func.count()).select_from(LLMAdmission)) == 60
