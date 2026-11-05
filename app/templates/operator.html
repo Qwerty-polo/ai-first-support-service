@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LumaDesk — звернення підтримки</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; color: #17202a; background: #f6f7f9; }
+    article { background: white; border: 1px solid #dce1e7; border-radius: 8px; padding: 1.2rem; margin: 1rem 0; }
+    h1 { font-size: 1.7rem; } h2 { font-size: 1.2rem; margin-top: 0; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+    .meta { color: #52616d; } .error { color: #9f1d20; } .actions { display: flex; gap: .7rem; }
+    button, .refresh { padding: .5rem .8rem; cursor: pointer; } a { color: #1253a4; }
+    button { border: 1px solid #667788; border-radius: 4px; background: white; font: inherit; }
+    .approve { background: #155c40; color: white; } nav { display: flex; gap: 1rem; }
+  </style>
+</head>
+<body>
+<h1>Звернення підтримки LumaDesk</h1>
+<p>Перевірте текст і джерела перед підтвердженням. <a class="refresh" href="/operator/?page={{ page }}">Оновити</a></p>
+{% set states = {'pending': 'Очікує обробки', 'running': 'Обробляється', 'succeeded': 'Готово', 'failed': 'Помилка'} %}
+{% for event, job in rows %}
+<article>
+  <h2>{{ event.ticket_id }}</h2>
+  <div class="meta">{{ event.customer_email }} · {{ event.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</div>
+  <h3>Звернення</h3><pre>{{ event.message }}</pre>
+  <p>Генерація: <strong>{{ states[job.state] }}</strong> · спроб: {{ job.attempts }}</p>
+  {% if job.last_error %}<p class="error">Код помилки: {{ job.last_error }}</p>{% endif %}
+  {% if job.state == 'succeeded' and job.result %}
+    <h3>Чернетка</h3><pre>{{ job.result.message }}</pre>
+    {% if job.result.needs_clarification %}<p>Потрібне уточнення питання оператором.</p>{% endif %}
+    <ul>{% for source in job.result.sources %}
+      <li><a href="/kb/{{ source.id | urlencode }}">{{ source.title }}</a></li>
+    {% endfor %}</ul>
+    {% if event.decision == 'pending' %}
+      <div class="actions">
+      {% for action, label in [('approve', 'Підтвердити'), ('reject', 'Відхилити')] %}
+        <form method="post" action="/operator/jobs/{{ job.id }}/{{ action }}">
+          <input type="hidden" name="csrf" value="{{ csrf(job.id, action) }}">
+          <button class="{{ action }}" type="submit">{{ label }}</button>
+        </form>
+      {% endfor %}
+      </div>
+    {% endif %}
+  {% endif %}
+  {% if event.decision == 'approved' %}
+    {% set delivery = deliveries.get(event.event_id) %}
+    <p><strong>Підтверджено.</strong> Доставка: {{ states[delivery.state] if delivery else 'Очікує' }}.</p>
+    {% if delivery and delivery.last_error %}<p class="error">Код помилки доставки: {{ delivery.last_error }}</p>{% endif %}
+  {% elif event.decision == 'rejected' %}<p><strong>Відхилено.</strong> Відповідь не надсилатиметься.</p>{% endif %}
+</article>
+{% else %}<p>Звернень поки немає.</p>{% endfor %}
+<nav>
+{% if page > 1 %}<a href="?page={{ page - 1 }}">Попередні</a>{% endif %}
+<span>Сторінка {{ page }}</span>
+{% if has_next %}<a href="?page={{ page + 1 }}">Наступні</a>{% endif %}
+</nav>
+</body>
+</html>

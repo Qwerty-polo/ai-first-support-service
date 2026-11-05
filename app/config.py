@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="gpt-4.1-mini", min_length=1)
     worker_parallelism: int = Field(default=32, ge=1, le=60)
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://localhost:8000")
+    operator_username: str = Field(default="operator", min_length=1)
+    operator_password: SecretStr = SecretStr("local-demo")
 
 
 @lru_cache
