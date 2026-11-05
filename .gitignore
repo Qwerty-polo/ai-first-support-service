@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.venv/
+.venv313/
+.python-runtime/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+.stage-tools/
