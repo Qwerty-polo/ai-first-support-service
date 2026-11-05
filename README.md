@@ -1,7 +1,7 @@
 # Support Draft Service
 
-Тестове завдання AI-first Backend Engineer: сервіс готуватиме відповіді підтримки
-за базою знань і надсилатиме їх лише після підтвердження оператором.
+Тестове завдання AI-first Backend Engineer: сервіс готує відповіді підтримки
+за базою знань і надсилає їх лише після підтвердження оператором.
 
 **Стан: локальний сценарій реалізовано й перевірено.** Працюють `/health` і
 `POST /webhooks/helpdesk`, транзакційне збереження події та generation job у PostgreSQL.
@@ -10,6 +10,8 @@ Worker генерує чернетки та зберігає їх у `jobs.resul
 Оператор підтверджує або відхиляє чернетку через захищений вебінтерфейс.
 Підтвердження атомарно створює delivery job з копією тексту. Worker надсилає її моку
 хелпдеску зі стабільним ключем ідемпотентності. Результати перевірок — [docs/verification.md](docs/verification.md).
+
+Архітектура, схема потоку та пояснення вибору рішень — [docs/architecture.md](docs/architecture.md).
 
 ## Docker Compose
 
@@ -73,6 +75,7 @@ Worker в іншому терміналі: `uv run --locked python -m app.worker
 .venv313\Scripts\python.exe -m pytest
 .venv313\Scripts\ruff.exe check .
 .venv313\Scripts\ruff.exe format --check .
+.venv313\Scripts\python.exe -m mypy
 .venv313\Scripts\alembic.exe heads
 docker compose config --quiet
 ```
@@ -100,6 +103,28 @@ $env:TEST_DATABASE_URL = 'postgresql+asyncpg://support:support@127.0.0.1:5432/po
 міграції та видаляють лише цю БД після завершення. Базу з указаного DSN не очищають.
 Без `TEST_DATABASE_URL` інтеграційні тести пропускаються; це не повна перевірка.
 Використовуємо `127.0.0.1`: на цій Windows IPv6 для `localhost` затримує підключення.
+
+### Coverage та CI
+
+```powershell
+$env:TEST_DATABASE_URL = 'postgresql+asyncpg://support:support@127.0.0.1:5432/postgres'
+.venv313\Scripts\python.exe -m pytest -q --cov --cov-report=term-missing --cov-report=html --cov-report=xml
+```
+
+Інтерактивний звіт — `htmlcov/index.html`, машинний — `coverage.xml` (обидва поза Git).
+Вимірюються всі модулі `app`, рядки та розгалуження. У `pyproject.toml` встановлено
+поріг 90%; нижче нього команда завершується помилкою. Налаштовано greenlet concurrency
+для коректного обліку SQLAlchemy async, без приховування непокритих модулів.
+
+`.github/workflows/ci.yml` підготовлено для push/PR: locked dependencies, Ruff,
+строгий mypy, міграції, тести на PostgreSQL і coverage artifact. CI не потребує
+LLM-ключа; усі HTTP-виклики тестів контрольовані. Сам GitHub workflow буде виконаний
+після публікації репозиторію, його віддалений запуск поки не перевірений.
+
+Конфігурація спирається на документацію [pytest-cov](https://pytest-cov.readthedocs.io/en/latest/config.html),
+[coverage concurrency](https://coverage.readthedocs.io/en/latest/config.html#run-concurrency),
+[mypy](https://mypy.readthedocs.io/en/stable/config_file.html) та
+[uv у GitHub Actions](https://docs.astral.sh/uv/guides/integration/github/).
 
 ## Вебхук
 

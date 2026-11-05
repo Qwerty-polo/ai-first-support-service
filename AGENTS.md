@@ -27,6 +27,7 @@
 
 ## Verification and delivery
 - Run `.venv313/Scripts/python.exe -m pytest`, Ruff check and Ruff format check locally.
+- Also run strict mypy for `app`; full PostgreSQL coverage must meet the configured 90% floor.
 - Test PostgreSQL constraints and concurrent behavior on PostgreSQL, not SQLite.
 - Use controlled LLMs in bulk tests; paid calls require explicit user approval.
 - Preserve meaningful Git commits without squash; commit these instructions and project docs.
