@@ -1,0 +1,47 @@
+name: support-draft-service
+
+services:
+  postgres:
+    image: postgres:17.6-bookworm
+    environment:
+      POSTGRES_DB: support
+      POSTGRES_USER: support
+      POSTGRES_PASSWORD: support
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U support -d support"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://support:support@postgres:5432/support
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://support:support@postgres:5432/support
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:

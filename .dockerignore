@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+.venv
+.venv313
+.python-runtime
+.idea
+__pycache__
+.pytest_cache
+.ruff_cache
+.stage-tools
+tests
