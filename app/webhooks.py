@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models import HelpdeskEvent, Job
+from app.reply_urls import reply_url_allowed
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -82,8 +83,13 @@ async def persist_event(
 @router.post("/webhooks/helpdesk", response_model=WebhookReceipt, status_code=202)
 async def receive_helpdesk(
     payload: HelpdeskWebhook,
+    request: Request,
     factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
 ) -> WebhookReceipt:
+    if not reply_url_allowed(
+        str(payload.reply_url), request.app.state.settings.allowed_reply_origins
+    ):
+        raise HTTPException(422, "reply_url origin is not allowed")
     try:
         # Leave headroom under the helpdesk's 2-second timeout; no provider calls here.
         async with asyncio.timeout(1.5):

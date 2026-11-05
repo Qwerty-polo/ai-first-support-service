@@ -74,3 +74,19 @@ class LLMAdmission(Base):
     __tablename__ = "llm_admissions"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     admitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class MockAttempt(Base):
+    __tablename__ = "mock_attempts"
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    attempts: Mapped[int] = mapped_column(server_default="1")
+
+
+class MockReceipt(Base):
+    __tablename__ = "mock_receipts"
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    ticket_id: Mapped[str] = mapped_column(String(200), index=True)
+    message: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sql_text("now()")
+    )

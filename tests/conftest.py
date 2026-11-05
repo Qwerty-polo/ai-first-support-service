@@ -50,7 +50,9 @@ async def database_url() -> AsyncIterator[str]:
 async def engine(database_url: str) -> AsyncIterator[AsyncEngine]:
     engine = create_async_engine(database_url)
     async with engine.begin() as connection:
-        await connection.execute(text("TRUNCATE jobs, helpdesk_events, llm_admissions"))
+        await connection.execute(
+            text("TRUNCATE jobs, helpdesk_events, llm_admissions, mock_receipts, mock_attempts")
+        )
         await connection.execute(text("UPDATE llm_policy SET concurrency=4"))
     try:
         yield engine

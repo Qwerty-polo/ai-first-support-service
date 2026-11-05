@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://localhost:8000")
     operator_username: str = Field(default="operator", min_length=1)
     operator_password: SecretStr = SecretStr("local-demo")
+    allowed_reply_origins: list[str] = ["http://mock-helpdesk:8000"]
+    helpdesk_api_token: SecretStr = SecretStr("local-mock-token")
 
 
 @lru_cache
