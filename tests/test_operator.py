@@ -99,6 +99,10 @@ async def test_csrf_is_required_and_bound_to_action(
     client: AsyncClient, engine: AsyncEngine
 ) -> None:
     job = await seed(engine)
+    unicode_token = await client.post(
+        f"/operator/jobs/{job}/approve", data={"csrf": "некоректний-токен"}
+    )
+    assert unicode_token.status_code == 403
     assert (
         await client.post(f"/operator/jobs/{job}/approve", data={"csrf": "bad"})
     ).status_code == 403

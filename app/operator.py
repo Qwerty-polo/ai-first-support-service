@@ -149,7 +149,7 @@ async def decide(
     sessions: Sessions,
     csrf: Annotated[str, Form()],
 ) -> RedirectResponse:
-    if not secrets.compare_digest(csrf, csrf_token(settings, job_id, action)):
+    if not secrets.compare_digest(csrf.encode(), csrf_token(settings, job_id, action).encode()):
         raise HTTPException(403, "Invalid CSRF token")
     try:
         await review_job(sessions, job_id, action)
