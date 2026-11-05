@@ -77,7 +77,7 @@ async def review_job(
         if event.decision != "pending":
             raise HTTPException(409, "Draft already reviewed")
         generation = await session.get(Job, job_id)
-        if generation.state != "succeeded" or not generation.result:
+        if generation is None or generation.state != "succeeded" or not generation.result:
             raise HTTPException(409, "Draft is not ready")
         message = generation.result.get("message")
         if not isinstance(message, str) or not message.strip():

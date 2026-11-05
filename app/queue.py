@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from random import uniform
 from typing import Any
 from uuid import UUID, uuid4
@@ -34,7 +34,7 @@ class Queue:
             # All workers serialize admission through one DB row, including retries.
             # This lock is released before any handler/network operation starts.
             policy = (await session.scalars(select(LLMPolicy).with_for_update())).one()
-            now = await session.scalar(select(func.clock_timestamp()))
+            now: datetime = (await session.execute(select(func.clock_timestamp()))).scalar_one()
             expired = and_(Job.state == "running", Job.lease_until <= now)
             await session.execute(
                 update(Job)
@@ -49,12 +49,16 @@ class Queue:
             await session.execute(
                 delete(LLMAdmission).where(LLMAdmission.admitted_at <= now - timedelta(seconds=60))
             )
-            active = await session.scalar(
-                select(func.count())
-                .select_from(Job)
-                .where(Job.kind == "generation", Job.state == "running", Job.lease_until > now)
-            )
-            admissions = await session.scalar(select(func.count()).select_from(LLMAdmission))
+            active = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(Job)
+                    .where(Job.kind == "generation", Job.state == "running", Job.lease_until > now)
+                )
+            ).scalar_one()
+            admissions = (
+                await session.execute(select(func.count()).select_from(LLMAdmission))
+            ).scalar_one()
             eligible_kinds = list(kinds)
             if active >= policy.concurrency or admissions >= 60:
                 eligible_kinds = [kind for kind in kinds if kind != "generation"]

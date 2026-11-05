@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import httpx
@@ -144,3 +145,52 @@ async def test_article_links_resolve_to_real_content() -> None:
             response = await client.get(article.url)
             assert response.status_code == 200 and article.title in response.text
         assert (await client.get("/kb/missing")).status_code == 404
+
+
+async def test_missing_sources_never_contacts_provider() -> None:
+    def forbidden(request: httpx.Request) -> httpx.Response:
+        pytest.fail("No sources should prevent a provider call")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(forbidden)) as client:
+        with pytest.raises(PermanentError, match="no_sources"):
+            await OpenAIAdapter(Settings(_env_file=None), client).generate("question", [])
+
+
+@pytest.mark.parametrize("error", [httpx.ReadTimeout("offline"), TimeoutError()])
+async def test_keyed_network_failure_is_retryable(error: Exception) -> None:
+    calls = 0
+
+    def unavailable(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        raise error
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(unavailable)) as client:
+        with pytest.raises(RetryableError, match="provider_network_error"):
+            await OpenAIAdapter(
+                Settings(_env_file=None, openai_api_key="test-only"), client
+            ).generate("PDF", [ARTICLES[0]])
+    assert calls == 1
+
+
+async def test_no_key_hanging_provider_is_bounded_by_total_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # HTTPX's mock transport doesn't enforce socket timeouts; exercise our outer deadline.
+    real_timeout = asyncio.timeout
+    monkeypatch.setattr("app.llm.asyncio.timeout", lambda seconds: real_timeout(0.02))
+    delays = []
+
+    async def hanging(request: httpx.Request) -> httpx.Response:
+        await asyncio.Event().wait()
+        return httpx.Response(200)
+
+    async def sleep(seconds: float) -> None:
+        delays.append(seconds)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(hanging)) as client:
+        result = await OpenAIAdapter(
+            Settings(_env_file=None, openai_api_key=""), client, sleep=sleep, delay=lambda: 5
+        ).generate("question", [ARTICLES[0]])
+    assert result.article_ids == ["export-pdf"]
+    assert 4 < delays[0] < 5

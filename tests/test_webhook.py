@@ -183,6 +183,8 @@ async def test_database_outage_returns_retryable_error() -> None:
         {"customer_email": "invalid"},
         {"reply_url": "file:///secret"},
         {"reply_url": "http://user:pass@host/replies"},
+        {"reply_url": "http://untrusted.example/replies"},
+        {"reply_url": "http://mock-helpdesk:8000/replies#fragment"},
         {"message": "x" * 20001},
     ],
 )

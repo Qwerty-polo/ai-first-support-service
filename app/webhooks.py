@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
@@ -42,7 +42,7 @@ class WebhookReceipt(BaseModel):
 
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
-    return request.app.state.session_factory
+    return cast(async_sessionmaker[AsyncSession], request.app.state.session_factory)
 
 
 async def persist_event(

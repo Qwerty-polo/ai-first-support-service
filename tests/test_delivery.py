@@ -31,6 +31,9 @@ BODY = {"ticket_id": "T1", "message": "Approved answer"}
         "http://mock-helpdesk:8000/reply#fragment",
         "file:///secret",
         "http://127.0.0.1:8000/reply",
+        "http://mock-helpdesk:8000/reply\\secret",
+        "http://mock-helpdesk:8000/reply\nsecret",
+        "http://mock-helpdesk:0/reply",
     ],
 )
 async def test_url_policy_rejects_untrusted_destinations(url: str) -> None:
@@ -210,3 +213,24 @@ async def test_mock_failure_modes(
                     503 if scenario == "always-500" else 201
                 )
     assert delays == [8, 8]
+
+
+async def test_mock_rejects_bad_credentials_and_ticket_mismatch(
+    engine: AsyncEngine, database_url: str
+) -> None:
+    app = create_mock_app(Settings(_env_file=None, database_url=database_url))
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://mock"
+        ) as client:
+            assert (await client.get("/health")).status_code == 200
+            assert (
+                await client.post(
+                    "/tickets/T1/replies", json=BODY, headers={"Idempotency-Key": "key"}
+                )
+            ).status_code == 401
+            assert (
+                await client.post("/tickets/T2/replies", json=BODY, headers=HEADERS)
+            ).status_code == 422
+    async with engine.connect() as connection:
+        assert await connection.scalar(select(func.count()).select_from(MockReceipt)) == 0

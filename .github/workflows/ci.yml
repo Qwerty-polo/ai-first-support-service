@@ -1,0 +1,52 @@
+name: Checks
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.6-bookworm
+        env:
+          POSTGRES_USER: support
+          POSTGRES_PASSWORD: support
+          POSTGRES_DB: support
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U support -d support"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      DATABASE_URL: postgresql+asyncpg://support:support@127.0.0.1:5432/support
+      TEST_DATABASE_URL: postgresql+asyncpg://support:support@127.0.0.1:5432/postgres
+      OPENAI_API_KEY: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.10"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked mypy
+      - name: Migrate empty database and detect schema drift
+        run: |
+          uv run --locked alembic upgrade head
+          uv run --locked alembic check
+      - name: Tests and branch coverage on PostgreSQL
+        run: uv run --locked pytest -q --cov --cov-report=term-missing --cov-report=html --cov-report=xml
+      - name: Save coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: |
+            htmlcov/
+            coverage.xml
+          retention-days: 7
+      - run: docker compose config --quiet
