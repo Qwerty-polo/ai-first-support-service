@@ -12,6 +12,7 @@ from app.main import create_app
 
 
 def test_search_finds_pdf_and_does_not_invent_matches() -> None:
+    assert search_articles("Як відновити пароль?")[0].id == "reset-password"
     assert search_articles("Не можу експортувати звіт у PDF")[0].id == "export-pdf"
     assert search_articles("квантовий телепортатор") == []
     assert 5 <= len(ARTICLES) <= 10
