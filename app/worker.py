@@ -7,18 +7,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import get_settings
 from app.db import create_engine, create_session_factory
+from app.errors import PermanentError, RetryableError
 from app.queue import HANDLER_TIMEOUT, Claim, Queue
 
 logger = logging.getLogger(__name__)
 Handler = Callable[[Claim], Awaitable[dict[str, Any]]]
-
-
-class RetryableError(Exception):
-    """A temporary provider failure. Exception messages must not be logged."""
-
-
-class PermanentError(Exception):
-    """A request that should not be retried."""
 
 
 class Worker:
@@ -56,16 +49,25 @@ class Worker:
 
 
 async def main() -> None:
+    import httpx
+
+    from app.generation import GenerationHandler
+    from app.llm import OpenAIAdapter
+
     settings = get_settings()
     logging.basicConfig(level=settings.log_level)
     engine = create_engine(settings)
-    # Register real adapters in the next stage. Unknown jobs must remain pending.
-    worker = Worker(Queue(create_session_factory(engine)), handlers={})
-    logger.info("Worker ready; generation adapter is not configured yet")
     try:
-        async with asyncio.TaskGroup() as group:
-            for _ in range(settings.worker_parallelism):
-                group.create_task(worker.run())
+        async with httpx.AsyncClient(follow_redirects=False) as client:
+            sessions = create_session_factory(engine)
+            handler = GenerationHandler(
+                sessions, OpenAIAdapter(settings, client), str(settings.public_base_url)
+            )
+            worker = Worker(Queue(sessions), handlers={"generation": handler})
+            logger.info("Worker ready; generation adapter configured")
+            async with asyncio.TaskGroup() as group:
+                for _ in range(settings.worker_parallelism):
+                    group.create_task(worker.run())
     finally:
         await engine.dispose()
 

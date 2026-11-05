@@ -38,4 +38,5 @@
 ## Agent configuration used
 Codex desktop, repository rules in this file, task specification and decisions in `docs/`.
 The `documents` skill was used to read the employer's DOCX; it is a host tool, not a dependency.
+The `openai-docs` skill was used to verify the Responses API and structured-output format.
 No provider key or paid external operation is needed for foundation verification.

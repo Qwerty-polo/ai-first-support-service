@@ -33,7 +33,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://support:support@postgres:5432/support
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -50,6 +50,9 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://support:support@postgres:5432/support
       WORKER_PARALLELISM: ${WORKER_PARALLELISM:-32}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:${APP_PORT:-8000}}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
     depends_on:
       migrate:
         condition: service_completed_successfully

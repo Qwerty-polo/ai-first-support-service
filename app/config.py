@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, PostgresDsn, SecretStr
+from pydantic import AnyHttpUrl, Field, PostgresDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,8 +13,9 @@ class Settings(BaseSettings):
     )
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     openai_api_key: SecretStr = SecretStr("")
-    openai_model: str = ""
+    openai_model: str = Field(default="gpt-4.1-mini", min_length=1)
     worker_parallelism: int = Field(default=32, ge=1, le=60)
+    public_base_url: AnyHttpUrl = AnyHttpUrl("http://localhost:8000")
 
 
 @lru_cache
