@@ -5,7 +5,7 @@
 Тестове завдання AI-first Backend Engineer: сервіс готує відповіді підтримки
 за базою знань і надсилає їх лише після підтвердження оператором.
 
-**Стан: локальний сценарій реалізовано й перевірено.** Працюють `/health` і
+**Стан: локальний сценарій і публічне демо реалізовано й перевірено.** Працюють `/health` і
 `POST /webhooks/helpdesk`, транзакційне збереження події та generation job у PostgreSQL.
 Worker підтримує захоплення, повтори, відновлення й глобальний допуск до LLM.
 Worker генерує чернетки та зберігає їх у `jobs.result`. База знань доступна за `/kb/{id}`.
@@ -22,6 +22,23 @@ Worker генерує чернетки та зберігає їх у `jobs.resul
 
 Для окремого демо на сервері з іншими сервісами див. [docs/deployment.md](docs/deployment.md):
 власна БД, обмеження ресурсів, приватні порти й HTTPS через Caddy.
+
+Тимчасове демо для перевірки завдання:
+
+- [Інтерфейс оператора](https://support-demo-13-49-224-87.sslip.io/operator/).
+- [Health](https://support-demo-13-49-224-87.sslip.io/health).
+- Webhook: `POST https://support-demo-13-49-224-87.sslip.io/webhooks/helpdesk`.
+- Облікові дані оператора передаються окремо. Використовуйте лише штучні звернення.
+- Працює без API-ключа за умовою завдання. Демо тимчасове; URL залежить від IP сервера.
+
+```bash
+curl -X POST https://support-demo-13-49-224-87.sslip.io/webhooks/helpdesk \
+  -H 'Content-Type: application/json' \
+  -d '{"event_id":"reviewer-demo-1","ticket_id":"REVIEW-1","customer_email":"demo@example.com","message":"Як відновити пароль?","reply_url":"http://mock-helpdesk:8000/tickets/REVIEW-1/replies"}'
+```
+
+Після approve отриману відповідь можна перевірити за
+`https://support-demo-13-49-224-87.sslip.io/mock/messages/REVIEW-1` з HTTP Basic оператора.
 
 Потрібен Docker Desktop із запущеним Linux engine та Docker Compose v2.
 
@@ -298,7 +315,7 @@ approve та створення delivery job відбуваються разом
 Деталі HTTP-доставки, конфігурація та сценарії мока — у [docs/delivery.md](docs/delivery.md).
 
 Фінальний локальний аудит завершено. Платні LLM-виклики не виконувалися.
-Публічний сервіс поки не розгорнуто; наведені нижче адреси стосуються локального запуску.
+Публічне тимчасове демо наведено на початку README; приклади нижче стосуються локального запуску.
 
 ## Демонстрація за кілька хвилин
 
