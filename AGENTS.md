@@ -36,6 +36,27 @@
 - Before public deployment, protect operator actions and allowlist helpdesk reply destinations.
 - Do not claim exactly-once delivery for a helpdesk without durable idempotency support.
 
+## User data and secrets
+Clarified at the user's request on 2026-11-06.
+
+- Preserve existing user files, local configuration, database contents and Docker volumes.
+  Do not delete, reset or overwrite them unless that operation is explicitly authorized.
+  Use isolated temporary databases for tests; never clear the application database.
+- Keep local secrets and environment-specific configuration in the ignored `.env` file
+  or environment variables. Do not overwrite an existing `.env` with example values.
+  Store only variable names, placeholders and clearly marked local demo values in `.env.example`.
+- Customer messages, database dumps and backups stay in their appropriate data stores;
+  `.env` is for configuration, not a place to move application data.
+- Keep credentials, private keys, local environments, logs, dumps and private data out of
+  Git and the Docker build context. Maintain `.gitignore` and `.dockerignore` when adding
+  such files. Do not print secret values or customer content while checking them.
+- Before committing, inspect the staged paths and diff. An ignore rule does not remove
+  an already tracked file or its history. If a secret is found tracked, report it safely
+  and agree on rotation/remediation; never silently rewrite Git history.
+- Record new lasting user rules in this file and implementation decisions in
+  `docs/decisions.md`. Summarize accurately, without copying secrets or customer data,
+  inventing user instructions, or presenting later additions as earlier instructions.
+
 ## Agent configuration used
 Codex desktop, repository rules in this file, task specification and decisions in `docs/`.
 The `documents` skill was used to read the employer's DOCX; it is a host tool, not a dependency.

@@ -1,5 +1,7 @@
 # Support Draft Service
 
+[![Checks](https://github.com/Qwerty-polo/ai-first-support-service/actions/workflows/ci.yml/badge.svg)](https://github.com/Qwerty-polo/ai-first-support-service/actions/workflows/ci.yml)
+
 Тестове завдання AI-first Backend Engineer: сервіс готує відповіді підтримки
 за базою знань і надсилає їх лише після підтвердження оператором.
 
@@ -13,18 +15,23 @@ Worker генерує чернетки та зберігає їх у `jobs.resul
 
 Архітектура, схема потоку та пояснення вибору рішень — [docs/architecture.md](docs/architecture.md).
 
+Локально перевірено: **92 тести на PostgreSQL, Windows і Linux; coverage 98.70%
+із розгалуженнями; строгий mypy та Ruff**. Поточний результат GitHub Actions — у badge вище.
+
 ## Docker Compose
 
 Потрібен Docker Desktop із запущеним Linux engine та Docker Compose v2.
 
 ```powershell
+git clone https://github.com/Qwerty-polo/ai-first-support-service.git
+cd ai-first-support-service
 docker compose up --build
 ```
 
 `docker compose up` також працює і будує образ, якщо його ще немає.
 Compose запускає PostgreSQL, чекає його готовності, виконує `alembic upgrade head`
 в одноразовому контейнері `migrate`, потім запускає API.
-Зовнішні ключі та файл `.env` для цього етапу не потрібні.
+Зовнішні ключі та файл `.env` для локального запуску не потрібні.
 
 - Перевірка: `http://localhost:8000/health` → HTTP 200, `{"status":"ok"}`.
 - OpenAPI: `http://localhost:8000/docs`.
@@ -68,6 +75,22 @@ uv run --locked uvicorn app.main:app --reload --no-access-log
 Worker в іншому терміналі: `uv run --locked python -m app.worker`
 (також задайте `UV_PROJECT_ENVIRONMENT=.venv313`).
 Змінні оточення мають пріоритет над `.env`. Не виводьте об'єкт Settings або DSN у логи.
+
+## Правила роботи агента й приватні дані
+
+[AGENTS.md](AGENTS.md) містить правила реалізації, перевірок і збереження даних.
+Вимоги роботодавця записані в [специфікації](docs/specification.md), а прийняті
+технічні рішення — в [docs/decisions.md](docs/decisions.md). Нові довготривалі
+домовленості дописуються до цих файлів і зберігаються окремими Git-комітами.
+
+- Секрети та локальні налаштування — у `.env` або змінних оточення.
+- `.env.example` містить лише безпечні приклади й демонстраційні локальні значення.
+- `.gitignore` і `.dockerignore` виключають приватні ключі, локальні середовища,
+  AWS-конфігурацію, логи та каталоги `secrets/`, `private-data/`, `backups/`, `dumps/`.
+- Наявні `.env`, дані БД і Docker volumes зберігаються; тести використовують окремі БД.
+
+`.gitignore` не видаляє вже відстежувані файли чи їхню історію. Перед публікацією
+потрібно перевіряти вміст Git, а не лише наявність ignore-правил.
 
 ## Перевірки
 
@@ -118,8 +141,8 @@ $env:TEST_DATABASE_URL = 'postgresql+asyncpg://support:support@127.0.0.1:5432/po
 
 `.github/workflows/ci.yml` підготовлено для push/PR: locked dependencies, Ruff,
 строгий mypy, міграції, тести на PostgreSQL і coverage artifact. CI не потребує
-LLM-ключа; усі HTTP-виклики тестів контрольовані. Сам GitHub workflow буде виконаний
-після публікації репозиторію, його віддалений запуск поки не перевірений.
+LLM-ключа; усі HTTP-виклики тестів контрольовані. Результати запусків і звіти доступні
+на вкладці [Actions](https://github.com/Qwerty-polo/ai-first-support-service/actions).
 
 Конфігурація спирається на документацію [pytest-cov](https://pytest-cov.readthedocs.io/en/latest/config.html),
 [coverage concurrency](https://coverage.readthedocs.io/en/latest/config.html#run-concurrency),
@@ -271,8 +294,8 @@ approve та створення delivery job відбуваються разом
 
 Деталі HTTP-доставки, конфігурація та сценарії мока — у [docs/delivery.md](docs/delivery.md).
 
-Фінальний локальний аудит завершено; проєкт підготовлено до огляду користувачем.
-Публікацію GitHub і платні зовнішні дії ще не виконували.
+Фінальний локальний аудит завершено. Платні LLM-виклики не виконувалися.
+Публічний сервіс поки не розгорнуто; наведені нижче адреси стосуються локального запуску.
 
 ## Демонстрація за кілька хвилин
 

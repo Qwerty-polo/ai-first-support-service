@@ -1,8 +1,7 @@
 .env
 .env.*
 !.env.example
-.venv/
-.venv313/
+.venv*/
 .python-runtime/
 .idea/
 __pycache__/
@@ -18,3 +17,15 @@ htmlcov/
 build/
 dist/
 .stage-tools/
+
+# Private local data and credentials; safe examples belong in .env.example.
+.aws/
+secrets/
+private-data/
+backups/
+dumps/
+*.pem
+*.key
+*.p12
+*.pfx
+*.log

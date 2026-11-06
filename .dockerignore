@@ -1,8 +1,7 @@
 .git
 .env
 .env.*
-.venv
-.venv313
+.venv*
 .python-runtime
 .idea
 __pycache__
@@ -14,3 +13,13 @@ coverage.xml
 htmlcov
 .stage-tools
 tests
+.aws
+secrets
+private-data
+backups
+dumps
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.log
