@@ -1,6 +1,8 @@
 # Результати фінальної локальної перевірки
 
-Перевірено 2026-11-06 перед оглядом користувача. Публікація та деплой не виконувалися.
+Перевірено 2026-11-06. Після огляду користувач погодив публікацію:
+[GitHub-репозиторій](https://github.com/Qwerty-polo/ai-first-support-service).
+Публічний деплой сервісу ще не виконувався.
 
 ## Автоматичні перевірки
 
@@ -40,11 +42,13 @@ LLM, approve/reject, повторним approve й 503 від helpdesk. Пере
 | Модерація перед відправленням | Atomic approve/job; reject без доставки | `test_operator.py`, `test_delivery.py`, `test_workflow.py` |
 | 201, 5xx, timeout, без дубля | Адаптер і стабільний ключ, надійний мок | `test_delivery.py`: одночасні дублікати, втрачений ACK, restart |
 | `/health`, PostgreSQL, Compose | Liveness, Alembic, окремі процеси | `test_health.py`, міграції fixture, перевірки Compose нижче |
-| Інструкції й конфігурація агента | README, docs, AGENTS, Git-історія | Збережені в репозиторії; публікація очікує погодження |
+| Інструкції й конфігурація агента | README, docs, AGENTS, Git-історія | Опубліковані на GitHub з оригінальною історією без squash |
 
-GitHub Actions підготовлено для push/PR: Ruff, mypy, міграції й PostgreSQL-тести,
-мінімум 90% coverage та HTML/XML artifact. Віддалений workflow ще не запускався:
-репозиторій не опублікований. Налаштування coverage явно враховує greenlet;
+GitHub Actions виконує для push/PR Ruff, mypy, міграції й PostgreSQL-тести,
+мінімум 90% coverage та HTML/XML artifact. Перший віддалений запуск успішний:
+[Checks #1](https://github.com/Qwerty-polo/ai-first-support-service/actions/runs/42134099067).
+Поточний результат показаний у README та на вкладці Actions.
+Налаштування coverage явно враховує greenlet;
 перший пробний звіт без цього параметра мав неточні дані для async SQLAlchemy.
 
 ## Перевірка обсягу
@@ -85,4 +89,4 @@ Compose запущено під окремим project name з новим Postgr
 - Глобальний ліміт у БД стосується допусків до LLM-обробника; довільна пауза ОС між
   допуском і HTTP-викликом може змінити фактичний час запиту.
 - Перед публічним деплоєм потрібні власні секрети, HTTPS, правильний PUBLIC_BASE_URL
-  та довірений allowlist. GitHub-публікація — після погодження користувача.
+  та довірений allowlist.
