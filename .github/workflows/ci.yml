@@ -50,3 +50,10 @@ jobs:
             coverage.xml
           retention-days: 7
       - run: docker compose config --quiet
+      - name: Validate isolated demo configuration
+        run: docker compose -f compose.yaml -f compose.demo.yaml config --quiet
+        env:
+          DEMO_DB_PASSWORD: configuration-check-only
+          OPERATOR_PASSWORD: configuration-check-only
+          HELPDESK_API_TOKEN: configuration-check-only
+          PUBLIC_BASE_URL: https://demo.example.com

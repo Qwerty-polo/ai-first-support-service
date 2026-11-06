@@ -1,0 +1,51 @@
+# Apply after compose.yaml; requires Docker Compose 2.24.4+ for !override.
+name: support-assignment-demo
+
+x-database: &database
+  DATABASE_URL: postgresql+asyncpg://support:${DEMO_DB_PASSWORD:?Set DEMO_DB_PASSWORD}@postgres:5432/support
+
+services:
+  postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${DEMO_DB_PASSWORD:?Set DEMO_DB_PASSWORD}
+    command: ["postgres", "-c", "shared_buffers=16MB", "-c", "max_connections=40", "-c", "work_mem=2MB"]
+    mem_limit: 128m
+    cpus: 0.5
+    restart: unless-stopped
+
+  migrate:
+    image: support-assignment-demo:current
+    environment: *database
+    mem_limit: 96m
+    cpus: 0.5
+
+  app:
+    image: support-assignment-demo:current
+    ports: !override ["127.0.0.1:18081:8000"]
+    environment:
+      <<: *database
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:?Set a unique OPERATOR_PASSWORD}
+    mem_limit: 96m
+    cpus: 0.5
+    restart: unless-stopped
+
+  worker:
+    image: support-assignment-demo:current
+    environment:
+      <<: *database
+      HELPDESK_API_TOKEN: ${HELPDESK_API_TOKEN:?Set a unique HELPDESK_API_TOKEN}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Set the public HTTPS URL}
+    mem_limit: 128m
+    cpus: 0.5
+
+  mock-helpdesk:
+    image: support-assignment-demo:current
+    ports: !override ["127.0.0.1:18082:8000"]
+    environment:
+      <<: *database
+      HELPDESK_API_TOKEN: ${HELPDESK_API_TOKEN:?Set a unique HELPDESK_API_TOKEN}
+      OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:?Set a unique OPERATOR_PASSWORD}
+    mem_limit: 96m
+    cpus: 0.25
+    restart: unless-stopped

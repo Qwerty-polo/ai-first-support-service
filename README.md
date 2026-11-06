@@ -20,6 +20,9 @@ Worker генерує чернетки та зберігає їх у `jobs.resul
 
 ## Docker Compose
 
+Для окремого демо на сервері з іншими сервісами див. [docs/deployment.md](docs/deployment.md):
+власна БД, обмеження ресурсів, приватні порти й HTTPS через Caddy.
+
 Потрібен Docker Desktop із запущеним Linux engine та Docker Compose v2.
 
 ```powershell
